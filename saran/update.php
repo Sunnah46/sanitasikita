@@ -1,58 +1,43 @@
 <?php
-// Koneksi ke database menggunakan file db.php
-include_once '../../config/db.php';
-
-// Menentukan bahwa respon akan dalam format JSON
+include_once '../db.php';
 header('Content-Type: application/json');
 
-// Mengambil data dari form POST
-$id = $_POST['id'];          // ID untuk mengetahui record mana yang akan diupdate
-$user_id         = $_POST['user_id'];          // Nomor Induk Mahasiswa
-$kategori = $_POST['kategori']; // Nama lengkap mahasiswa
-$isi       = $_POST['isi'];        // Email mahasiswa
-$tanggal  = $_POST['tanggal'];   // tanggal
+// Ambil dari POST
+$id       = $_POST['id'] ?? null;
+$user_id  = $_POST['user_id'] ?? null;
+$kategori = $_POST['kategori'] ?? null;
+$isi      = $_POST['isi'] ?? null;
 
-try {
-    // Mempersiapkan statement SQL untuk mengupdate data
-    // Gunakan prepared statement untuk mencegah SQL injection
-    $stmt = $conn->prepare("
-        UPDATE mahasiswa
-        SET user_id = ?, kategori = ?, isi = ?, tanggal = ?
-        WHERE id = ?
-    ");
-
-    // Eksekusi statement dengan parameter
-    $stmt->execute([$user_id, $kategori, $isi, $tanggal]);
-
-    // Jika eksekusi berhasil, kirimkan respon sukses
+// Validasi
+if (!$id) {
     echo json_encode([
-        "status"  => "success",
-        "message" => "Data mahasiswa berhasil diperbarui",
-        "data"    => [
-            "id"  => $id,
-            "user_id"           => $user_id,
-            "kategori"  => $kategori,
-            "isi"         => $isi,
-            "tanggal"    => $tanggal,
-           ]
+        "status" => "error",
+        "message" => "ID wajib dikirim"
     ]);
+    exit;
+}
 
-} catch(PDOException $e) {
-    // Jika eksekusi gagal, kirimkan pesan error
+$stmt = $conn->prepare("
+    UPDATE saran 
+    SET user_id = ?, kategori = ?, isi = ?
+    WHERE id = ?
+");
+
+$stmt->bind_param("issi", $user_id, $kategori, $isi, $id);
+
+if ($stmt->execute()) {
     echo json_encode([
-        "status"  => "error",
-        "message" => $e->getMessage()
+        "status" => "success",
+        "message" => "Data berhasil diupdate",
+        "affected_rows" => $stmt->affected_rows
+    ]);
+} else {
+    echo json_encode([
+        "status" => "error",
+        "message" => $stmt->error
     ]);
 }
 
-// Koneksi akan ditutup otomatis saat script selesai
-/*
-PETUNJUK UNTUK MENYESUAIKAN DENGAN SCHEMA TABEL LAIN:
-
-Jika ingin menggunakan skema tabel yang berbeda, ubah bagian-bagian berikut:
-1. Nama tabel: Ganti 'mahasiswa' dengan nama tabel Anda
-2. Nama kolom: Ganti 'id', 'user_id', 'kategori', 'isi', 'tanggal', sesuai dengan kolom di tabel Anda
-3. Parameter POST: Sesuaikan dengan nama field yang dikirim dari form Anda
-4. Tipe data parameter: Tidak perlu lagi karena PDO menangani tipe data secara otomatis
-*/
+$stmt->close();
+$conn->close();
 ?>

@@ -1,65 +1,70 @@
 <?php
-// Koneksi ke database menggunakan file db.php
-include_once '../../config/db.php';
-
-// Menentukan bahwa respon akan dalam format JSON
+include_once '../db.php';
 header('Content-Type: application/json');
 
-// Mengambil data dari form POST
-$id         = $_POST['id'];           // Nomor Induk Mahasiswa
-$materi_id = $_POST['materi_id']; // Nama lengkap mahasiswa
-$pertanyaan       = $_POST['pertanyaan'];         // Email mahasiswa
-$pilihan_a  = $_POST['pilihan_a'];    // ID Jurusan mahasiswa
-$pilihan_b = $_POST['pilihan_b']; // Tanggal lahir mahasiswa
-$pilihan_c      = $_POST['pilihan_c'];        // Alamat mahasiswa
-$jawaban_benar = $_POST['jawaban_benar']; // jawaban benar
+/*
+CREATE DATA KUIS MENGGUNAKAN METHOD GET
+*/
 
-try {
-    // Mempersiapkan statement SQL untuk menyimpan data baru
-    // Gunakan prepared statement untuk mencegah SQL injection
-    $stmt = $conn->prepare("
-        INSERT INTO mahasiswa (id, materi_id, pertanyaan, pilihan_a, pilihan_b, pilihan_c, jawaban_benar)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ");
+// Ambil data dari GET
+$materi_id     = $_GET['materi_id'] ?? '';
+$pertanyaan    = $_GET['pertanyaan'] ?? '';
+$pilihan_a     = $_GET['pilihan_a'] ?? '';
+$pilihan_b     = $_GET['pilihan_b'] ?? '';
+$pilihan_c     = $_GET['pilihan_c'] ?? '';
+$jawaban_benar = $_GET['jawaban_benar'] ?? '';
 
-    // Eksekusi statement dengan parameter
-    $stmt->execute([$id, $materi_id, $pertanyaan, $pilihan_a, $pilihan_b, $pilihan_c, $jawaban_benar]);
+// Validasi
+if (
+    empty($materi_id) ||
+    empty($pertanyaan) ||
+    empty($pilihan_a) ||
+    empty($pilihan_b) ||
+    empty($pilihan_c) ||
+    empty($jawaban_benar)
+) {
+    echo json_encode([
+        "status" => "error",
+        "message" => "Parameter GET tidak lengkap"
+    ]);
+    exit;
+}
 
-    // Jika eksekusi berhasil, ambil ID terakhir yang dimasukkan
-    $last_id = $conn->lastInsertId();
+// SQL CREATE (INSERT)
+$sql = "
+    INSERT INTO kuis
+    (materi_id, pertanyaan, pilihan_a, pilihan_b, pilihan_c, jawaban_benar)
+    VALUES (?, ?, ?, ?, ?, ?)
+";
 
-    // Kirimkan respon sukses beserta data yang disimpan
+$stmt = $conn->prepare($sql);
+$stmt->bind_param(
+    "isssss",
+    $materi_id,
+    $pertanyaan,
+    $pilihan_a,
+    $pilihan_b,
+    $pilihan_c,
+    $jawaban_benar
+);
+
+// Eksekusi
+if ($stmt->execute()) {
     echo json_encode([
         "status"  => "success",
-        "message" => "Data mahasiswa berhasil ditambahkan",
+        "message" => "Data kuis berhasil ditambahkan (GET)",
         "data"    => [
-            "id_mahasiswa"  => $last_id,
-            "id"           => $id,
-            "materi_id"  => $materi_id,
-            "pertanyaan"         => $pertanyaan,
-            "pilihan_a"    => $pilihan_a,
-            "pilihan_b" => $pilihan_b,
-            "pilihan_c"        => $pilihan_c,
-            "jawaban_benar" => $jawaban_benar
+            "id" => $stmt->insert_id,
+            "materi_id" => $materi_id
         ]
     ]);
-
-} catch(PDOException $e) {
-    // Jika eksekusi gagal, kirimkan pesan error
+} else {
     echo json_encode([
-        "status"  => "error",
-        "message" => $e->getMessage()
+        "status" => "error",
+        "message" => $stmt->error
     ]);
 }
 
-// Koneksi akan ditutup otomatis saat script selesai
-/*
-PETUNJUK UNTUK MENYESUAIKAN DENGAN SCHEMA TABEL LAIN:
-
-Jika ingin menggunakan skema tabel yang berbeda, ubah bagian-bagian berikut:
-1. Nama tabel: Ganti 'mahasiswa' dengan nama tabel Anda
-2. Nama kolom: Ganti 'id', 'materi_id', 'pertanyaan', 'pilihan_a', 'pilihan_b', 'pilihan_c' sesuai dengan kolom di tabel Anda
-3. Parameter POST: Sesuaikan dengan nama field yang dikirim dari form Anda
-4. Tipe data parameter: Tidak perlu lagi karena PDO menangani tipe data secara otomatis
-*/
+$stmt->close();
+$conn->close();
 ?>

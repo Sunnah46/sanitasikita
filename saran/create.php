@@ -1,62 +1,49 @@
 <?php
-// Koneksi ke database menggunakan file db.php
-include_once '../../config/db.php';
-
-// Menentukan bahwa respon akan dalam format JSON
+include_once '../db.php';
 header('Content-Type: application/json');
 
-// Mengambil data dari form POST
-$id         = $_POST['id'];           // Nomor Induk Mahasiswa
-$user_id = $_POST['user_id']; // Nama lengkap mahasiswa
-$kategori       = $_POST['kategori'];         // Email mahasiswa
-$isi  = $_POST['isi'];    // ID Jurusan mahasiswa
-$tanggal = $_POST['tanggal']; // Tanggal lahir mahasiswa
+// Ambil dari GET
+$user_id = $_GET['user_id'] ?? null;
+$kategori = $_GET['kategori'] ?? null;
+$isi = $_GET['isi'] ?? null;
 
-try {
-    // Mempersiapkan statement SQL untuk menyimpan data baru
-    // Gunakan prepared statement untuk mencegah SQL injection
-    $stmt = $conn->prepare("
-        INSERT INTO mahasiswa (id, user_id, kategori, isi, tanggal)
-        VALUES (?, ?, ?, ?, ?)
-    ");
+// Validasi
+if (!$user_id || !$kategori || !$isi) {
+    echo json_encode([
+        "status" => "error",
+        "message" => "user_id, kategori, dan isi wajib dikirim"
+    ]);
+    exit;
+}
 
-    // Eksekusi statement dengan parameter
-    $stmt->execute([$id, $user_id, $kategori, $isi, $tanggal]);
+// Insert data
+$stmt = $conn->prepare("
+    INSERT INTO saran (user_id, kategori, isi)
+    VALUES (?, ?, ?)
+");
 
-    // Jika eksekusi berhasil, ambil ID terakhir yang dimasukkan
-    $last_id = $conn->lastInsertId();
+$stmt->bind_param("iss", $user_id, $kategori, $isi);
 
-    // Kirimkan respon sukses beserta data yang disimpan
+if ($stmt->execute()) {
+
     echo json_encode([
         "status"  => "success",
-        "message" => "Data mahasiswa berhasil ditambahkan",
+        "message" => "Data saran berhasil ditambahkan (GET)",
         "data"    => [
-            "id_mahasiswa"  => $last_id,
-            "id"           => $id,
-            "user_id"  => $user_id,
-            "kategori"         => $kategori,
-            "isi"    => $isi,
-            "tanggal" => $tanggal,
-            
+            "id" => $stmt->insert_id,
+            "user_id" => $user_id,
+            "kategori" => $kategori,
+            "isi" => $isi
         ]
     ]);
 
-} catch(PDOException $e) {
-    // Jika eksekusi gagal, kirimkan pesan error
+} else {
     echo json_encode([
-        "status"  => "error",
-        "message" => $e->getMessage()
+        "status" => "error",
+        "message" => $stmt->error
     ]);
 }
 
-// Koneksi akan ditutup otomatis saat script selesai
-/*
-PETUNJUK UNTUK MENYESUAIKAN DENGAN SCHEMA TABEL LAIN:
-
-Jika ingin menggunakan skema tabel yang berbeda, ubah bagian-bagian berikut:
-1. Nama tabel: Ganti 'mahasiswa' dengan nama tabel Anda
-2. Nama kolom: Ganti 'id', 'user_id', 'kategori', 'isi', 'tanggal', sesuai dengan kolom di tabel Anda
-3. Parameter POST: Sesuaikan dengan nama field yang dikirim dari form Anda
-4. Tipe data parameter: Tidak perlu lagi karena PDO menangani tipe data secara otomatis
-*/
+$stmt->close();
+$conn->close();
 ?>

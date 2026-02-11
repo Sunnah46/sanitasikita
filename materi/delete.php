@@ -1,43 +1,54 @@
 <?php
-// Koneksi ke database menggunakan file db.php
-include_once '../../config/db.php';
-
-// Menentukan bahwa respon akan dalam format JSON
+include '../db.php';
 header('Content-Type: application/json');
 
-// Mengambil ID dari form POST untuk mengetahui record mana yang akan dihapus
-$id = $_POST['id'];
+$input = json_decode(file_get_contents("php://input"), true);
+$id = $_POST['id'] ?? $input['id'] ?? null;
 
-try {
-    // Mempersiapkan statement SQL untuk menghapus data
-    // Gunakan prepared statement untuk mencegah SQL injection
-    $stmt = $conn->prepare("DELETE FROM materi WHERE id = ?");
-
-    // Eksekusi statement dengan parameter
-    $stmt->execute([$id]);
-
-    // Jika eksekusi berhasil, kirimkan respon sukses
+if (!$id) {
     echo json_encode([
-        "status"  => "success",
-        "message" => "Data materi berhasil dihapus"
+        "status" => "error",
+        "message" => "ID wajib dikirim"
     ]);
-
-} catch(PDOException $e) {
-    // Jika eksekusi gagal, kirimkan pesan error
-    echo json_encode([
-        "status"  => "error",
-        "message" => $e->getMessage()
-    ]);
+    exit;
 }
 
-// Koneksi akan ditutup otomatis saat script selesai
-/*
-PETUNJUK UNTUK MENYESUAIKAN DENGAN SCHEMA TABEL LAIN:
-
-Jika ingin menggunakan skema tabel yang berbeda, ubah bagian-bagian berikut:
-1. Nama tabel: Ganti 'materi' dengan nama tabel Anda
-2. Nama kolom: Ganti 'id' sesuai dengan kolom primary key di tabel Anda
-3. Parameter POST: Sesuaikan dengan nama field yang dikirim dari form Anda
-4. Tipe data parameter: Tidak perlu lagi karena PDO menangani tipe data secara otomatis
+/* 
+CEK: apakah materi dipakai di kuis
 */
-?>
+$cekKuis = $conn->prepare("SELECT COUNT(*) AS total FROM kuis WHERE materi_id = ?");
+$cekKuis->bind_param("i", $id);
+$cekKuis->execute();
+$res1 = $cekKuis->get_result()->fetch_assoc();
+
+/*
+CEK: apakah materi dipakai di hasil_kuis
+*/
+$cekHasil = $conn->prepare("SELECT COUNT(*) AS total FROM hasil_kuis WHERE materi_id = ?");
+$cekHasil->bind_param("i", $id);
+$cekHasil->execute();
+$res2 = $cekHasil->get_result()->fetch_assoc();
+
+if ($res1['total'] > 0 || $res2['total'] > 0) {
+    echo json_encode([
+        "status" => "error",
+        "message" => "Materi tidak bisa dihapus karena masih digunakan oleh kuis atau hasil kuis"
+    ]);
+    exit;
+}
+
+/* 
+Jika aman → hapus
+*/
+$del = $conn->prepare("DELETE FROM materi WHERE id = ?");
+$del->bind_param("i", $id);
+$del->execute();
+
+echo json_encode([
+    "status" => "success",
+    "message" => "Materi berhasil dihapus",
+    "deleted_id" => $id
+]);
+
+$del->close();
+$conn->close();

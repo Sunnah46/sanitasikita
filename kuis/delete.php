@@ -1,43 +1,43 @@
 <?php
-// Koneksi ke database menggunakan file db.php
-include_once '../../config/db.php';
-
-// Menentukan bahwa respon akan dalam format JSON
+include '../db.php';
 header('Content-Type: application/json');
 
-// Mengambil ID dari form POST untuk mengetahui record mana yang akan dihapus
-$id = $_POST['id'];
+// Ambil ID dari GET atau POST
+$id = $_GET['id'] ?? $_POST['id'] ?? null;
 
-try {
-    // Mempersiapkan statement SQL untuk menghapus data
-    // Gunakan prepared statement untuk mencegah SQL injection
-    $stmt = $conn->prepare("DELETE FROM kuis WHERE materi_id = ?");
-
-    // Eksekusi statement dengan parameter
-    $stmt->execute([$id]);
-
-    // Jika eksekusi berhasil, kirimkan respon sukses
+// Validasi ID
+if (!$id) {
     echo json_encode([
-        "status"  => "success",
-        "message" => "Data kuis berhasil dihapus"
+        "status" => "error",
+        "message" => "ID wajib dikirim"
     ]);
+    exit;
+}
 
-} catch(PDOException $e) {
-    // Jika eksekusi gagal, kirimkan pesan error
+// Jalankan DELETE
+$del = $conn->prepare("DELETE FROM kuis WHERE id = ?");
+$del->bind_param("i", $id);
+$del->execute();
+
+// Cek hasil
+if ($del->affected_rows > 0) {
+    // Data benar-benar terhapus
     echo json_encode([
-        "status"  => "error",
-        "message" => $e->getMessage()
+        "status" => "success",
+        "message" => "Data berhasil dihapus",
+        "deleted_id" => $id,
+        "affected_rows" => $del->affected_rows
+    ]);
+} else {
+    // Data sudah tidak ada → tetap sukses (idempotent)
+    echo json_encode([
+        "status" => "success",
+        "message" => "Data sudah tidak ada atau sudah dihapus sebelumnya",
+        "deleted_id" => $id,
+        "affected_rows" => 0
     ]);
 }
 
-// Koneksi akan ditutup otomatis saat script selesai
-/*
-PETUNJUK UNTUK MENYESUAIKAN DENGAN SCHEMA TABEL LAIN:
-
-Jika ingin menggunakan skema tabel yang berbeda, ubah bagian-bagian berikut:
-1. Nama tabel: Ganti 'kuis' dengan nama tabel Anda
-2. Nama kolom: Ganti 'id' sesuai dengan kolom primary key di tabel Anda
-3. Parameter POST: Sesuaikan dengan nama field yang dikirim dari form Anda
-4. Tipe data parameter: Tidak perlu lagi karena PDO menangani tipe data secara otomatis
-*/
+$del->close();
+$conn->close();
 ?>

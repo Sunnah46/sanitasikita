@@ -1,43 +1,33 @@
 <?php
-// Koneksi ke database menggunakan file db.php
-include_once '../../config/db.php';
-
-// Menentukan bahwa respon akan dalam format JSON
+include_once '../db.php';
 header('Content-Type: application/json');
 
-// Mengambil ID dari form POST untuk mengetahui record mana yang akan dihapus
-$id = $_POST['id'];
+$id = $_POST['id'] ?? null;
 
-try {
-    // Mempersiapkan statement SQL untuk menghapus data
-    // Gunakan prepared statement untuk mencegah SQL injection
-    $stmt = $conn->prepare("DELETE FROM saran WHERE user_id = ?");
-
-    // Eksekusi statement dengan parameter
-    $stmt->execute([$id]);
-
-    // Jika eksekusi berhasil, kirimkan respon sukses
+if (!$id) {
     echo json_encode([
-        "status"  => "success",
-        "message" => "Data saran berhasil dihapus"
+        "status" => "error",
+        "message" => "ID wajib dikirim"
     ]);
+    exit;
+}
 
-} catch(PDOException $e) {
-    // Jika eksekusi gagal, kirimkan pesan error
+$stmt = $conn->prepare("DELETE FROM saran WHERE id = ?");
+$stmt->bind_param("i", $id);
+
+if ($stmt->execute()) {
     echo json_encode([
-        "status"  => "error",
-        "message" => $e->getMessage()
+        "status" => "success",
+        "message" => "Data berhasil dihapus",
+        "affected_rows" => $stmt->affected_rows
+    ]);
+} else {
+    echo json_encode([
+        "status" => "error",
+        "message" => $stmt->error
     ]);
 }
 
-// Koneksi akan ditutup otomatis saat script selesai
-/*
-PETUNJUK UNTUK MENYESUAIKAN DENGAN SCHEMA TABEL LAIN:
-
-Jika ingin menggunakan skema tabel yang berbeda, ubah bagian-bagian berikut:
-1. Nama tabel: Ganti 'saran' dengan nama tabel Anda
-2. Nama kolom: Ganti 'id' sesuai dengan kolom primary key di tabel Anda
-3. Parameter POST: Sesuaikan dengan nama field yang dikirim dari form Anda
-4. Tipe data parameter: Tidak perlu lagi karena PDO menangani tipe data secara otomatis
-*/
+$stmt->close();
+$conn->close();
 ?>
